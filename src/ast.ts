@@ -278,9 +278,45 @@ function isValidNormalizeOptions(
   return options.every(option => option in HashFieldNormalizeOptions)
 }
 
-// Helper function to read schema from file
+// Helper function to read schema from file or directory
+// Supports Prisma 7's multi-file schema feature
 export function analyseSchemaFile(schemaPath: string): ASTModels {
   const fs = require('fs')
-  const schemaContent = fs.readFileSync(schemaPath, 'utf8')
+  const path = require('path')
+  
+  const stats = fs.statSync(schemaPath)
+  
+  if (stats.isDirectory()) {
+    // Multi-file schema: read all .prisma files in the directory
+    const files = fs.readdirSync(schemaPath)
+      .filter((file: string) => file.endsWith('.prisma'))
+      .sort() // Sort for consistent ordering
+    
+    if (files.length === 0) {
+      throw new Error(`No .prisma files found in directory: ${schemaPath}`)
+    }
+    
+    // Concatenate all schema files
+    const schemaContent = files
+      .map((file: string) => fs.readFileSync(path.join(schemaPath, file), 'utf8'))
+      .join('\n\n')
+    
+    return analyseSchema(schemaContent)
+  } else {
+    // Single file schema (traditional approach)
+    const schemaContent = fs.readFileSync(schemaPath, 'utf8')
+    return analyseSchema(schemaContent)
+  }
+}
+
+// Helper function to read schema from multiple file paths
+export function analyseSchemaFiles(schemaPaths: string[]): ASTModels {
+  const fs = require('fs')
+  
+  // Concatenate all schema files
+  const schemaContent = schemaPaths
+    .map((filePath: string) => fs.readFileSync(filePath, 'utf8'))
+    .join('\n\n')
+  
   return analyseSchema(schemaContent)
 }

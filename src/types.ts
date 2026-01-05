@@ -36,8 +36,22 @@ export type Middleware<
 export interface Configuration {
   encryptionKey?: string
   decryptionKeys?: string[]
-  // DMMFDocument is deprecated, using schema content string instead
+  /**
+   * Path to the Prisma schema file or directory containing schema files.
+   * 
+   * For single-file schemas (traditional): './prisma/schema.prisma'
+   * For multi-file schemas (Prisma 7+): './prisma/schema/' (directory)
+   * 
+   * You can also use `schemaPaths` to specify multiple individual files.
+   */
   schemaPath?: string
+  /**
+   * Array of paths to individual Prisma schema files.
+   * Use this when you have multiple schema files in different locations.
+   * 
+   * If both schemaPath and schemaPaths are provided, schemaPaths takes precedence.
+   */
+  schemaPaths?: string[]
 }
 
 export type HashFieldConfiguration = {

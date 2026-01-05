@@ -144,6 +144,14 @@ export function decryptOnRead<Models extends string, Actions extends string>(
 ) {
   // Analyse the query to see if there's anything to decrypt.
   const model = models[params.model!]
+  if (!model) {
+    // Model not found in parsed schemas - this can happen with multi-file schemas
+    // where not all schema files were loaded. Skip decryption for this model.
+    debug.decryption(
+      `Skipping decryption: ${params.model} not found in parsed schema files`
+    )
+    return
+  }
   if (
     Object.keys(model.fields).length === 0 &&
     !params.args?.include &&
