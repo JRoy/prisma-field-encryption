@@ -28,9 +28,8 @@
   },
   "scripts": {
     "clean": "rm -rf ./dist ./coverage",
-    "prebuild": "run-s generate:prisma",
-    "build": "tsc",
-    "postbuild": "chmod +x ./dist/generator/main.js && cd node_modules/.bin && ln -sf ../../dist/generator/main.js ./prisma-field-encryption",
+    "build": "tsc && chmod +x ./dist/generator/main.js",
+    "postbuild": "cd node_modules/.bin && ln -sf ../../dist/generator/main.js ./prisma-field-encryption && cd ../.. && prisma generate",
     "generate": "run-s generate:*",
     "generate:prisma": "prisma generate",
     "test": "run-s test:**",
