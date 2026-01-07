@@ -1,0 +1,75 @@
+{
+  "User": {
+    "cursor": "id",
+    "fields": {
+      "name": {
+        "encrypt": true,
+        "strictDecryption": false,
+        "hash": {
+          "targetField": "nameHash",
+          "algorithm": "sha256",
+          "inputEncoding": "utf8",
+          "outputEncoding": "hex",
+          "normalize": [
+            "lowercase",
+            "diacritics",
+            "trim"
+          ]
+        }
+      }
+    },
+    "connections": {
+      "posts": {
+        "modelName": "Post",
+        "isList": true
+      },
+      "pinnedPost": {
+        "modelName": "Post",
+        "isList": false
+      }
+    }
+  },
+  "Post": {
+    "cursor": "id",
+    "fields": {
+      "content": {
+        "encrypt": true,
+        "strictDecryption": false
+      }
+    },
+    "connections": {
+      "author": {
+        "modelName": "User",
+        "isList": false
+      },
+      "categories": {
+        "modelName": "Category",
+        "isList": true
+      },
+      "havePinned": {
+        "modelName": "User",
+        "isList": true
+      }
+    }
+  },
+  "Category": {
+    "cursor": "id",
+    "fields": {},
+    "connections": {
+      "posts": {
+        "modelName": "Post",
+        "isList": true
+      }
+    }
+  },
+  "BigIntCursorTest": {
+    "cursor": "id",
+    "fields": {
+      "key": {
+        "encrypt": true,
+        "strictDecryption": false
+      }
+    },
+    "connections": {}
+  }
+}

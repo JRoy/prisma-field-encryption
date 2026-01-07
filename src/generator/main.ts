@@ -16,8 +16,7 @@ generatorHandler({
     return {
       prettyName: 'field-level encryption migrations',
       version: require('../../package.json').version,
-      requiresGenerators: ['prisma-client-js'],
-      defaultOutput: 'migrations'
+      defaultOutput: './prisma/field-encryption'
     }
   },
   async onGenerate(options) {
@@ -25,13 +24,24 @@ generatorHandler({
     const outputDir = options.generator.output?.value!
     const concurrently = options.generator.config?.concurrently === 'true'
     const prismaClient = options.otherGenerators.find(
-      each => each.provider.value === 'prisma-client-js'
-    )!
+      each =>
+        each.provider.value === 'prisma-client-js' ||
+        each.provider.value === 'prisma-client'
+    )
 
-    // mkdir -p
+    // Write the encrypted fields config to the output directory
     try {
       await fs.mkdir(outputDir, { recursive: true })
     } catch {}
+    await fs.writeFile(
+      path.join(outputDir, 'config.json'),
+      JSON.stringify(models, null, 2)
+    )
+
+    // Only generate migration files if prisma client is found
+    if (!prismaClient) {
+      return
+    }
 
     // Keep only models with encrypted fields & a valid cursor
     const validModels = Object.fromEntries(

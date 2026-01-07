@@ -3,20 +3,17 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { errors } from '../errors'
-import { makeExtensionClient, makeMiddlewareClient } from './prismaClient'
+import { makeExtensionClient } from './prismaClient'
 import * as sqlite from './sqlite'
 
-const clients = [
-  { type: 'middleware', client: makeMiddlewareClient() },
-  { type: 'extension', client: makeExtensionClient() }
-]
+describe('integration (extension)', () => {
+  const client = makeExtensionClient()
 
-describe.each(clients)('integration ($type)', ({ client }) => {
-  beforeAll(() => {
+  beforeAll(async () => {
     // Reset database
     const src = path.resolve(process.cwd(), 'prisma', 'db.test.sqlite')
     const dst = path.resolve(process.cwd(), 'prisma', 'db.integration.sqlite')
-    return fs.copyFile(src, dst)
+    await fs.copyFile(src, dst)
   })
 
   const email = '007@hmss.gov.uk'

@@ -1,18 +1,16 @@
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../src/tests/.generated/client"
 }
 
-// generator fieldEncryptionMigrations {
-//   provider     = "prisma-field-encryption"
-//   output       = "../src/tests/migrations"
-//   concurrently = true
-// }
+generator fieldEncryption {
+  provider = "prisma-field-encryption"
+  output   = "../src/tests/migrations"
+}
 
 model User {
   id           Int     @id @default(autoincrement())

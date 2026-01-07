@@ -16,7 +16,7 @@ export function hashString(
   if (config.salt) {
     hash.update(decode(config.salt))
   }
-  return encode(hash.digest())
+  return encode(new Uint8Array(hash.digest()))
 }
 
 export function normalizeHashString(

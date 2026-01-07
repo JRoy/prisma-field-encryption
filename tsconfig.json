@@ -37,6 +37,7 @@
     "node_modules",
     "./dist",
     "./prisma",
+    "./prisma.config.ts",
     "./src/tests/migrate.ts",
     "./src/tests/migrations/*.ts"
   ]

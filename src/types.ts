@@ -70,6 +70,17 @@ export interface Configuration {
   encryptionKey?: string
   decryptionKeys?: string[]
   dmmf?: Readonly<DMMFDocument>
+  /**
+   * Pre-analysed models configuration.
+   * If provided, this takes precedence over dmmf and configPath.
+   */
+  models?: Record<string, unknown>
+  /**
+   * Path to the generated config.json file.
+   * This should match the output path of the prisma-field-encryption generator.
+   * Example: './prisma/field-encryption/config.json'
+   */
+  configPath?: string
 }
 
 export type HashFieldConfiguration = {
