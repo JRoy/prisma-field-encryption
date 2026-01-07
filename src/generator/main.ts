@@ -9,12 +9,13 @@ import { generateModel } from './generateModel'
 
 export interface Config {
   concurrently?: boolean
+  generateMigrations?: boolean
 }
 
 generatorHandler({
   onManifest() {
     return {
-      prettyName: 'field-level encryption migrations',
+      prettyName: 'field-level encryption',
       version: require('../../package.json').version,
       defaultOutput: './prisma/field-encryption'
     }
@@ -22,12 +23,9 @@ generatorHandler({
   async onGenerate(options) {
     const models = analyseDMMF(options.dmmf)
     const outputDir = options.generator.output?.value!
+    const generateMigrations =
+      options.generator.config?.generateMigrations === 'true'
     const concurrently = options.generator.config?.concurrently === 'true'
-    const prismaClient = options.otherGenerators.find(
-      each =>
-        each.provider.value === 'prisma-client-js' ||
-        each.provider.value === 'prisma-client'
-    )
 
     // Write the encrypted fields config to the output directory
     try {
@@ -38,7 +36,17 @@ generatorHandler({
       JSON.stringify(models, null, 2)
     )
 
-    // Only generate migration files if prisma client is found
+    // Migration files are opt-in via generateMigrations = true
+    if (!generateMigrations) {
+      return
+    }
+
+    const prismaClient = options.otherGenerators.find(
+      each =>
+        each.provider.value === 'prisma-client-js' ||
+        each.provider.value === 'prisma-client'
+    )
+
     if (!prismaClient) {
       return
     }
