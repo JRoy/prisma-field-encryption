@@ -276,8 +276,9 @@ generator client {
 }
 
 generator fieldEncryptionMigrations {
-  provider     = "prisma-field-encryption"
-  output       = "./where/you/want/your/migrations"
+  provider           = "prisma-field-encryption"
+  output             = "./where/you/want/your/migrations"
+  generateMigrations = true
 
   // Optionally opt-in to concurrent model migration.
   // Since this can cause timeouts and performance issues,

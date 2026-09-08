@@ -8,8 +8,9 @@ generator client {
 }
 
 generator fieldEncryption {
-  provider = "prisma-field-encryption"
-  output   = "../src/tests/migrations"
+  provider           = "prisma-field-encryption"
+  output             = "../src/tests/migrations"
+  generateMigrations = true
 }
 
 model User {
