@@ -71,7 +71,7 @@ function isObject(item: Json): item is Dict {
   )
 }
 
-function isCollection(item: Json): item is Array<Json> | Dict {
+export function isCollection(item: Json): item is Array<Json> | Dict {
   return Array.isArray(item) || isObject(item)
 }
 
