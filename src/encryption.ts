@@ -15,7 +15,10 @@ import type { DMMFModels } from './dmmf'
 import { errors, warnings } from './errors'
 import { hashString } from './hash'
 import type { Configuration, MiddlewareParams } from './types'
-import { visitInputTargetFields, visitOutputTargetFields } from './visitor'
+import { Dict, isCollection, Json } from './traverseTree'
+import { visitInputTargetFields } from './visitor'
+
+const { hasOwnProperty } = Object.prototype
 
 export interface KeysConfiguration {
   encryptionKey: ParsedCloakKey
@@ -57,6 +60,9 @@ export function encryptOnWrite<Models extends string, Actions extends string>(
   models: DMMFModels,
   operation: string
 ) {
+  if (!mentionsEncryptedField(params.args, getModelIndex(models))) {
+    return params
+  }
   debug.encryption('Clear-text input: %O', params)
   const encryptionErrors: string[] = []
   const mutatedParams = produce(
@@ -142,19 +148,10 @@ export function decryptOnRead<Models extends string, Actions extends string>(
   models: DMMFModels,
   operation: string
 ) {
-  // Analyse the query to see if there's anything to decrypt.
-  const model = models[params.model!]
-  if (
-    Object.keys(model.fields).length === 0 &&
-    !params.args?.include &&
-    !params.args?.select
-  ) {
-    // The queried model doesn't have any encrypted field,
-    // and there are no included connections.
-    // We can safely skip decryption for the returned data.
-    // todo: Walk the include/select tree for a better decision.
+  const index = getModelIndex(models)
+  if (!index.reachable.has(params.model!) || !isCollection(result)) {
     debug.decryption(
-      `Skipping decryption: ${params.model} has no encrypted field and no connection was included`
+      `Skipping decryption: no encrypted field can be reached from ${params.model}`
     )
     return
   }
@@ -164,37 +161,83 @@ export function decryptOnRead<Models extends string, Actions extends string>(
   const decryptionErrors: string[] = []
   const fatalDecryptionErrors: string[] = []
 
-  visitOutputTargetFields(
-    params,
-    result,
-    models,
-    function decryptFieldValue({
-      fieldConfig,
-      value: cipherText,
-      path,
-      model,
-      field
-    }) {
-      try {
-        if (!parseCloakedString(cipherText)) {
-          return
-        }
-        const decryptionKey = findKeyForMessage(cipherText, keys.keychain)
-        const clearText = decryptStringSync(cipherText, decryptionKey)
-        objectPath.set(result, path, clearText)
-        debug.decryption(
-          `Decrypted ${model}.${field} at path \`${path}\` using key fingerprint ${decryptionKey.fingerprint}`
-        )
-      } catch (error) {
-        const message = errors.fieldDecryptionError(model, field, path, error)
-        if (fieldConfig.strictDecryption) {
-          fatalDecryptionErrors.push(message)
-        } else {
-          decryptionErrors.push(message)
+  const path: Array<string | number> = []
+  decryptNode(result, params.model!)
+
+  function decryptNode(node: Json[] | Dict, model: string) {
+    if (!index.reachable.has(model)) {
+      return
+    }
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) {
+        const child = node[i]
+        if (
+          typeof child === 'object' &&
+          child !== null &&
+          isCollection(child)
+        ) {
+          path.push(i)
+          decryptNode(child, model)
+          path.pop()
         }
       }
+      return
     }
-  )
+    const { fields, connections } = models[model]
+    for (const key in node) {
+      const child = node[key]
+      if (typeof child === 'string') {
+        if (hasOwnProperty.call(fields, key)) {
+          decryptField(node, key, child, model)
+        }
+      } else if (
+        typeof child === 'object' &&
+        child !== null &&
+        isCollection(child)
+      ) {
+        path.push(key)
+        decryptNode(
+          child,
+          hasOwnProperty.call(connections, key)
+            ? connections[key].modelName
+            : model
+        )
+        path.pop()
+      }
+    }
+  }
+
+  function decryptField(
+    node: Dict,
+    field: string,
+    cipherText: string,
+    model: string
+  ) {
+    if (!parseCloakedString(cipherText)) {
+      return
+    }
+    const fieldPath = [...path, field].join('.')
+    try {
+      const decryptionKey = findKeyForMessage(cipherText, keys.keychain)
+      node[field] = decryptStringSync(cipherText, decryptionKey)
+      debug.decryption(
+        `Decrypted ${model}.${field} at path \`${fieldPath}\` using key fingerprint ${decryptionKey.fingerprint}`
+      )
+    } catch (error) {
+      const message = errors.fieldDecryptionError(
+        model,
+        field,
+        fieldPath,
+        error
+      )
+      if (models[model].fields[field].strictDecryption) {
+        fatalDecryptionErrors.push(message)
+      } else {
+        decryptionErrors.push(message)
+      }
+    }
+  }
+
   if (decryptionErrors.length > 0) {
     console.error(errors.decryptionErrorReport(operation, decryptionErrors))
   }
@@ -204,6 +247,66 @@ export function decryptOnRead<Models extends string, Actions extends string>(
     )
   }
   debug.decryption('Decrypted result: %O', result)
+}
+
+interface ModelIndex {
+  reachable: Set<string>
+  encryptedFieldNames: Set<string>
+}
+
+const modelIndexCache = new WeakMap<DMMFModels, ModelIndex>()
+
+function getModelIndex(models: DMMFModels): ModelIndex {
+  const cached = modelIndexCache.get(models)
+  if (cached) {
+    return cached
+  }
+  const reachable = new Set(
+    Object.keys(models).filter(
+      model => Object.keys(models[model].fields).length > 0
+    )
+  )
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [model, { connections }] of Object.entries(models)) {
+      if (
+        !reachable.has(model) &&
+        Object.values(connections).some(({ modelName }) =>
+          reachable.has(modelName)
+        )
+      ) {
+        reachable.add(model)
+        changed = true
+      }
+    }
+  }
+  const encryptedFieldNames = new Set(
+    Object.values(models).flatMap(({ fields }) => Object.keys(fields))
+  )
+  const index = { reachable, encryptedFieldNames }
+  modelIndexCache.set(models, index)
+  return index
+}
+
+function mentionsEncryptedField(args: Json, index: ModelIndex) {
+  if (index.encryptedFieldNames.size === 0) {
+    return false
+  }
+  const stack = [args]
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    if (!isCollection(node)) {
+      continue
+    }
+    for (const key in node) {
+      if (index.encryptedFieldNames.has(key)) {
+        return true
+      }
+      stack.push((node as Dict)[key])
+    }
+  }
+  return false
 }
 
 function rewriteHashedFieldPath(
